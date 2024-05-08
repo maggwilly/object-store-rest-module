@@ -17,11 +17,9 @@ import java.util.Optional;
 public class RestObjectStoreManager implements ObjectStoreManager {
     private final Map<String, RestObjectStore> objectStores = new HashMap<>();
     private final HttpConnection httpConnection;
-    private final ObjectSerializer serializer;
     private final Scheduler scheduler;
-    public RestObjectStoreManager(HttpConnection httpConnection, ObjectSerializer serializer, Scheduler scheduler) {
+    public RestObjectStoreManager(HttpConnection httpConnection, Scheduler scheduler) {
         this.httpConnection = httpConnection;
-        this.serializer = serializer;
         this.scheduler = scheduler;
     }
 
@@ -40,7 +38,7 @@ public class RestObjectStoreManager implements ObjectStoreManager {
             if (this.objectStores.containsKey(name)) {
                 throw new IllegalArgumentException("An Object Store was already defined for name " + name);
             } else {
-                RestObjectStore store = new RestObjectStore(httpConnection, this.serializer, objectStoreSettings, this.scheduler,name );
+                RestObjectStore store = new RestObjectStore(httpConnection, objectStoreSettings, this.scheduler,name );
                 try {
                     store.open();
                 } catch (ObjectStoreException var7) {
@@ -60,7 +58,7 @@ public class RestObjectStoreManager implements ObjectStoreManager {
                 store = this.objectStores.get(name);
             } else {
                 try {
-                    store = new RestObjectStore(httpConnection, this.serializer,objectStoreSettings, this.scheduler,name );
+                    store = new RestObjectStore(httpConnection, objectStoreSettings, this.scheduler,name );
                     store.open();
                 } catch (ObjectStoreException var7) {
                     throw new UnableToSendRequestException(var7.getMessage(), var7);

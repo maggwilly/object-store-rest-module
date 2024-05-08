@@ -1,20 +1,14 @@
 package org.objectstore.rest.internal;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import org.mule.runtime.api.serialization.SerializationException;
-import org.objectstore.rest.http.HttpConnection;
-import org.objectstore.rest.http.HttpRequestBuilder;
-import org.objectstore.rest.http.HttpUtils;
-import org.objectstore.rest.internal.connection.params.httpConnectionParams;
-import org.objectstore.rest.internal.exception.InvalidDataException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.i18n.I18nMessageFactory;
 import org.mule.runtime.api.metadata.DataType;
 import org.mule.runtime.api.metadata.MediaType;
 import org.mule.runtime.api.metadata.TypedValue;
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.api.serialization.ObjectSerializer;
+import org.mule.runtime.api.serialization.SerializationException;
 import org.mule.runtime.api.store.ObjectStoreException;
 import org.mule.runtime.api.store.ObjectStoreSettings;
 import org.mule.runtime.api.store.TemplateObjectStore;
@@ -24,9 +18,15 @@ import org.mule.runtime.http.api.domain.entity.EmptyHttpEntity;
 import org.mule.runtime.http.api.domain.entity.HttpEntity;
 import org.mule.runtime.http.api.domain.message.request.HttpRequest;
 import org.mule.runtime.http.api.domain.message.response.HttpResponse;
+import org.objectstore.rest.http.HttpConnection;
+import org.objectstore.rest.http.HttpRequestBuilder;
+import org.objectstore.rest.http.HttpUtils;
+import org.objectstore.rest.internal.connection.params.httpConnectionParams;
+import org.objectstore.rest.internal.exception.InvalidDataException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -42,11 +42,10 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
     private final Integer entryTTL;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String name;
-    private ObjectSerializer objectSerializer;
     private Scheduler scheduler;
     private ScheduledFuture<?> scheduledTask;
 
-    public RestObjectStore(HttpConnection httpConnection, ObjectSerializer serializer, ObjectStoreSettings settings, Scheduler scheduler, String name) {
+    public RestObjectStore(HttpConnection httpConnection, ObjectStoreSettings settings, Scheduler scheduler, String name) {
         Integer entryTTL = httpConnection.getConnectionParams().getEntryTTL();
         Integer ttl = settings.getEntryTTL().map(Long::intValue).orElse(entryTTL);
         if (ttl == null) {
@@ -61,7 +60,6 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
         this.maxEntries = settings.getMaxEntries().orElse(null);
         this.httpConnection = httpConnection;
         this.expirationInterval = settings.getExpirationInterval();
-        this.objectSerializer = serializer;
         this.scheduler = scheduler;
     }
 
@@ -76,9 +74,9 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
         httpConnectionParams connectionParams = httpConnection.getConnectionParams();
         HttpRequestBuilder httpRequestBuilder = new HttpRequestBuilder(true);
         TypedValue<Serializable> typedValue = new TypedValue<>(serializable, DataType.JSON_STRING);
-        HttpEntity requestEntity = createRequestEntity(httpRequestBuilder, typedValue);
-        HttpRequest httpRequest = httpRequestBuilder.uri(getUri(key)).method(HttpConstants.Method.POST).entity(requestEntity).headers(connectionParams.getHeaders()).build();
         try {
+            HttpEntity requestEntity = createRequestEntity(httpRequestBuilder, typedValue);
+            HttpRequest httpRequest = httpRequestBuilder.uri(getUri(key)).method(HttpConstants.Method.POST).entity(requestEntity).headers(connectionParams.getHeaders()).build();
             HttpResponse httpResponse = doSent(httpRequest).get();
             LOGGER.info("Store response: {}", httpResponse.getEntity());
         } catch (Exception e) {
@@ -96,12 +94,12 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
         return connectionParams.getUrl() + "/" + key;
     }
 
-    private byte[] toByteArray(Serializable serializable) {
+    private byte[] toByteArray(Serializable serializable) throws JsonProcessingException {
         LOGGER.info("Serializable: {}", serializable);
         Map<String, Serializable> body = new HashMap<>();
         body.put("value", serializable);
-        Gson gson = new Gson();
-        return this.objectSerializer.getInternalProtocol().serialize(body);
+        String asString = objectMapper.writeValueAsString(body);
+        return objectMapper.writeValueAsBytes(asString);
     }
 
     private Serializable fromByteArray(byte[] bytes) {
@@ -109,17 +107,15 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
             return null;
         }
         try {
-            String deserialize = this.objectSerializer.getInternalProtocol().deserialize(bytes);
-            Gson gson = new Gson();
-            //Map<String, ? extends Serializable> map = gson.fromJson(deserialize, Map.class);
-            LOGGER.info("fromByteArray: {}", deserialize);
-            return deserialize;
-        } catch (SerializationException e){
+            Map<String, Serializable> map = objectMapper.readValue(bytes, Map.class);
+            LOGGER.info("fromByteArray: {}", map);
+            return map.get(VALUE_KEY);
+        } catch (SerializationException | IOException e){
             return null;
         }
     }
 
-    private HttpEntity createRequestEntity(HttpRequestBuilder httpRequestBuilder, TypedValue<Serializable> body) {
+    private HttpEntity createRequestEntity(HttpRequestBuilder httpRequestBuilder, TypedValue<Serializable> body) throws JsonProcessingException {
         Serializable payload = body.getValue();
         MediaType mediaType = body.getDataType().getMediaType();
         httpRequestBuilder.addHeader(org.objectstore.rest.http.HttpConstants.CONTENT_TYPE_HEADER, mediaType.toRfcString());

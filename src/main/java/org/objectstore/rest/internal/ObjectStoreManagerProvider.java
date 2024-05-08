@@ -1,9 +1,5 @@
 package org.objectstore.rest.internal;
 
-import org.objectstore.rest.http.HttpConnection;
-import org.objectstore.rest.http.HttpRequesterConnectionManager;
-import org.objectstore.rest.internal.connection.params.httpConnectionParams;
-import org.objectstore.rest.internal.stereotype.ObjectStoreConnectionStereotype;
 import org.mule.extension.http.api.request.authentication.HttpRequestAuthentication;
 import org.mule.runtime.api.connection.CachedConnectionProvider;
 import org.mule.runtime.api.connection.ConnectionValidationResult;
@@ -12,7 +8,6 @@ import org.mule.runtime.api.lifecycle.InitialisationException;
 import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerService;
-import org.mule.runtime.api.serialization.ObjectSerializer;
 import org.mule.runtime.api.store.ObjectStoreManager;
 import org.mule.runtime.api.tls.TlsContextFactory;
 import org.mule.runtime.core.api.lifecycle.LifecycleUtils;
@@ -26,6 +21,10 @@ import org.mule.runtime.extension.api.annotation.param.display.DisplayName;
 import org.mule.runtime.extension.api.annotation.param.display.Placement;
 import org.mule.runtime.extension.api.annotation.param.stereotype.Stereotype;
 import org.mule.runtime.http.api.client.HttpClientConfiguration;
+import org.objectstore.rest.http.HttpConnection;
+import org.objectstore.rest.http.HttpRequesterConnectionManager;
+import org.objectstore.rest.internal.connection.params.httpConnectionParams;
+import org.objectstore.rest.internal.stereotype.ObjectStoreConnectionStereotype;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,16 +63,13 @@ public class ObjectStoreManagerProvider   implements CachedConnectionProvider<Ob
   @DisplayName("Authentication")
   @Expression(ExpressionSupport.NOT_SUPPORTED)
   private HttpRequestAuthentication authentication;
-  @Inject
-  @Named("_muleDefaultObjectSerializer")
-  private ObjectSerializer serializer;
 
     @Override
     public ObjectStoreManager connect() {
       java.util.Optional<HttpRequesterConnectionManager.ShareableHttpClient> client = this.connectionManager.lookup(this.configName);
       HttpRequesterConnectionManager.ShareableHttpClient httpClient = client.orElseGet(() -> this.connectionManager.create(this.configName, this.getHttpClientConfiguration()));
       HttpConnection httpConnection = new HttpConnection(httpClient, authentication, this.connectionParams);
-        return new RestObjectStoreManager(httpConnection, this.serializer, this.schedulerService.customScheduler(this.schedulerConfig.withName(this.configName + "-Monitor").withMaxConcurrentTasks(1)));
+        return new RestObjectStoreManager(httpConnection, this.schedulerService.customScheduler(this.schedulerConfig.withName(this.configName + "-Monitor").withMaxConcurrentTasks(1)));
     }
 
   public void initialise() throws InitialisationException {
