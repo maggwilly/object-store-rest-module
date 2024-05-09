@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>6cde5e5e-816c-4ee5-b0ee-07655c9f5870</groupId>
+    <groupId>{ORG_ID}</groupId>
     <artifactId>object-store-rest-module</artifactId>
     <version>1.0.18-SNAPSHOT</version>
     <packaging>mule-extension</packaging>
