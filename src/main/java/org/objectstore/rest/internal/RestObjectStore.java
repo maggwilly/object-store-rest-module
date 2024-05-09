@@ -64,13 +64,13 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
     }
 
     @Override
-    protected boolean doContains(String s) {
-        return Objects.nonNull(doRetrieve(s));
+    protected boolean doContains(String key) {
+        return Objects.nonNull(doRetrieve(key));
     }
 
     @Override
     protected void doStore(String key, Serializable serializable) {
-        LOGGER.info("Storing : {} - {}", key, serializable);
+        LOGGER.trace("Storing : {} - {}", key, serializable);
         httpConnectionParams connectionParams = httpConnection.getConnectionParams();
         HttpRequestBuilder httpRequestBuilder = new HttpRequestBuilder(true);
         TypedValue<Serializable> typedValue = new TypedValue<>(serializable, DataType.JSON_STRING);
@@ -78,7 +78,7 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
             HttpEntity requestEntity = createRequestEntity(httpRequestBuilder, typedValue);
             HttpRequest httpRequest = httpRequestBuilder.uri(getUri(key)).method(HttpConstants.Method.POST).entity(requestEntity).headers(connectionParams.getHeaders()).build();
             HttpResponse httpResponse = doSent(httpRequest).get();
-            LOGGER.info("Store response: {}", httpResponse.getEntity());
+            LOGGER.trace("Store response: {}", httpResponse.getEntity());
         } catch (Exception e) {
             LOGGER.error("Failed to store value {}.", key, e);
             throw new RuntimeException(e);
@@ -95,7 +95,7 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
     }
 
     private byte[] toByteArray(Serializable serializable) throws JsonProcessingException {
-        LOGGER.info("Serializable: {}", serializable);
+        LOGGER.trace("Serializable: {}", serializable);
         Map<String, Serializable> body = new HashMap<>();
         body.put("value", serializable);
         String asString = objectMapper.writeValueAsString(body);
@@ -108,7 +108,7 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
         }
         try {
             Map<String, Serializable> map = objectMapper.readValue(bytes, Map.class);
-            LOGGER.info("fromByteArray: {}", map);
+            LOGGER.trace("fromByteArray: {}", map);
             return map.get(VALUE_KEY);
         } catch (SerializationException | IOException e){
             return null;
@@ -124,7 +124,7 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
 
     @Override
     protected Serializable doRetrieve(String key) {
-        LOGGER.info("Retrieving : {}", key);
+        LOGGER.trace("Retrieving : {}", key);
         httpConnectionParams connectionParams = httpConnection.getConnectionParams();
         HttpRequestBuilder httpRequestBuilder = new HttpRequestBuilder(true);
         HttpEntity requestEntity = new EmptyHttpEntity();
@@ -152,7 +152,7 @@ public class RestObjectStore extends TemplateObjectStore<Serializable> {
         HttpRequest httpRequest = httpRequestBuilder.uri(getUri(key)).method(HttpConstants.Method.DELETE).entity(requestEntity).headers(connectionParams.getHeaders()).build();
         try {
             HttpResponse httpResponse = doSent(httpRequest).get();
-            LOGGER.info("response: {}", httpResponse);
+            LOGGER.trace("response: {}", httpResponse);
             HttpEntity entity = httpResponse.getEntity();
             return fromByteArray(entity.getBytes());
         } catch (Exception e) {
